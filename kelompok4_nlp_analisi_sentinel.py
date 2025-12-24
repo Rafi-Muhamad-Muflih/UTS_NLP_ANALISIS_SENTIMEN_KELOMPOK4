@@ -2,28 +2,23 @@ import streamlit as st
 import pickle
 import re
 import nltk
+from nltk.corpus import stopwords
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 
 # =============================================================================
-# 1. KONFIGURASI HALAMAN (Wajib Paling Atas)
+# 1. KONFIGURASI HALAMAN & RESOURCE
 # =============================================================================
 st.set_page_config(page_title="Analisis Sentimen Shopee", page_icon="🛒")
 
-# =============================================================================
-# 2. DOWNLOAD RESOURCE NLTK (INI YANG HARUS DULUAN!)
-# =============================================================================
-# Kita download DULU sebelum import stopwords
+# Download resource NLTK (Hanya sekali jalan, aman ditaruh di sini)
 try:
     nltk.data.find('corpora/stopwords')
 except LookupError:
-    nltk.download('stopwords', quiet=True)
-    nltk.download('punkt', quiet=True)
-
-# SETELAH download berhasil, BARU kita import library-nya
-from nltk.corpus import stopwords  # <--- Perhatikan! Ini sekarang ada di bawah
+    nltk.download('stopwords')
+    nltk.download('punkt')
 
 # =============================================================================
-# 3. FUNGSI PREPROCESSING
+# 2. FUNGSI PREPROCESSING (WAJIB SAMA PERSIS DENGAN TRAINING)
 # =============================================================================
 # Inisialisasi Stemmer
 factory = StemmerFactory()
@@ -32,7 +27,7 @@ stemmer = factory.create_stemmer()
 # Konfigurasi Stopwords
 list_stopwords = set(stopwords.words('indonesian'))
 
-# DAFTAR KATA PENTING
+# DAFTAR KATA PENTING (Sama persis dengan script training terakhir)
 kata_penting = {
     # Kata Negatif
     'tidak', 'bukan', 'jangan', 'tak', 'belum', 'kurang', 'gak', 'ga', 'nggak',
@@ -65,9 +60,9 @@ def text_preprocessing(text):
     return processed_text
 
 # =============================================================================
-# 4. LOAD MODEL & VECTORIZER
+# 3. LOAD MODEL & VECTORIZER
 # =============================================================================
-@st.cache_resource
+@st.cache_resource # Agar tidak load ulang setiap kali klik tombol
 def load_assets():
     try:
         with open('model_sentiment.pkl', 'rb') as model_file:
@@ -81,11 +76,10 @@ def load_assets():
 model, vectorizer = load_assets()
 
 # =============================================================================
-# 5. TAMPILAN ANTARMUKA (UI)
+# 4. TAMPILAN ANTARMUKA (UI)
 # =============================================================================
 st.title("🛒 Analisis Sentimen Ulasan Shopee")
 st.markdown("Aplikasi untuk mendeteksi sentimen: **Positif**, **Netral**, atau **Negatif**.")
-st.markdown("**Kelompok 4 NLP** - Analisis Sentimen dengan Machine Learning")
 st.markdown("---")
 
 # Cek apakah model berhasil di-load
@@ -102,13 +96,13 @@ if st.button("🔍 Analisis Sentimen"):
             # 1. Preprocessing
             clean_text = text_preprocessing(input_text)
             
-            # 2. Vectorization
+            # 2. Vectorization (Ubah ke angka)
             text_vector = vectorizer.transform([clean_text])
             
-            # 3. Prediksi
+            # 3. Prediksi (Outputnya Angka: 0, 1, atau 2)
             prediksi_angka = model.predict(text_vector)[0]
             
-            # 4. Hasil
+            # 4. Logika Mapping Output (0=Negatif, 1=Netral, 2=Positif)
             st.markdown("### Hasil Analisis:")
             
             if prediksi_angka == 2: # Positif
@@ -117,14 +111,20 @@ if st.button("🔍 Analisis Sentimen"):
                 
             elif prediksi_angka == 1: # Netral
                 st.warning(f"😐 **NETRAL**")
-                st.write("Ulasan ini cenderung biasa saja, standar, atau memiliki sentimen campuran.")
+                st.write("Ulasan ini cenderung biasa saja, standar, atau memiliki sentimen campuran (bagus tapi ada kurangnya).")
                 
             elif prediksi_angka == 0: # Negatif
                 st.error(f"😡 **NEGATIF**")
                 st.write("Ulasan ini mengandung keluhan, kekecewaan, atau kemarahan.")
+                
+            # (Opsional) Tampilkan teks bersih untuk debug
+            with st.expander("Lihat Hasil Preprocessing (Debug)"):
+                st.text(f"Original: {input_text}")
+                st.text(f"Cleaned : {clean_text}")
 
     else:
         st.info("Silakan masukkan teks ulasan terlebih dahulu.")
 
+# Footer
 st.markdown("---")
 st.caption("Dikembangkan oleh Kelompok 4 NLP")
