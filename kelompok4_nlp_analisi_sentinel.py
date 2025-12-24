@@ -5,22 +5,25 @@ import nltk
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 
 # =============================================================================
-# 1. KONFIGURASI HALAMAN & RESOURCE (FIX URUTAN NLTK)
+# 1. KONFIGURASI HALAMAN (Wajib Paling Atas)
 # =============================================================================
 st.set_page_config(page_title="Analisis Sentimen Shopee", page_icon="🛒")
 
-# --- PENTING: Download dulu, BARU import stopwords ---
+# =============================================================================
+# 2. DOWNLOAD RESOURCE NLTK (INI YANG HARUS DULUAN!)
+# =============================================================================
+# Kita download DULU sebelum import stopwords
 try:
     nltk.data.find('corpora/stopwords')
 except LookupError:
     nltk.download('stopwords', quiet=True)
     nltk.download('punkt', quiet=True)
 
-# Setelah download berhasil, baru kita import
-from nltk.corpus import stopwords
+# SETELAH download berhasil, BARU kita import library-nya
+from nltk.corpus import stopwords  # <--- Perhatikan! Ini sekarang ada di bawah
 
 # =============================================================================
-# 2. FUNGSI PREPROCESSING
+# 3. FUNGSI PREPROCESSING
 # =============================================================================
 # Inisialisasi Stemmer
 factory = StemmerFactory()
@@ -62,7 +65,7 @@ def text_preprocessing(text):
     return processed_text
 
 # =============================================================================
-# 3. LOAD MODEL & VECTORIZER
+# 4. LOAD MODEL & VECTORIZER
 # =============================================================================
 @st.cache_resource
 def load_assets():
@@ -78,7 +81,7 @@ def load_assets():
 model, vectorizer = load_assets()
 
 # =============================================================================
-# 4. TAMPILAN ANTARMUKA (UI)
+# 5. TAMPILAN ANTARMUKA (UI)
 # =============================================================================
 st.title("🛒 Analisis Sentimen Ulasan Shopee")
 st.markdown("Aplikasi untuk mendeteksi sentimen: **Positif**, **Netral**, atau **Negatif**.")
@@ -99,13 +102,13 @@ if st.button("🔍 Analisis Sentimen"):
             # 1. Preprocessing
             clean_text = text_preprocessing(input_text)
             
-            # 2. Vectorization (Ubah ke angka)
+            # 2. Vectorization
             text_vector = vectorizer.transform([clean_text])
             
-            # 3. Prediksi (Outputnya Angka: 0, 1, atau 2)
+            # 3. Prediksi
             prediksi_angka = model.predict(text_vector)[0]
             
-            # 4. Logika Mapping Output
+            # 4. Hasil
             st.markdown("### Hasil Analisis:")
             
             if prediksi_angka == 2: # Positif
@@ -119,15 +122,9 @@ if st.button("🔍 Analisis Sentimen"):
             elif prediksi_angka == 0: # Negatif
                 st.error(f"😡 **NEGATIF**")
                 st.write("Ulasan ini mengandung keluhan, kekecewaan, atau kemarahan.")
-                
-            # Debug (Opsional - Bisa dihapus kalau sudah fix)
-            with st.expander("Lihat Hasil Preprocessing (Debug)"):
-                st.text(f"Original: {input_text}")
-                st.text(f"Cleaned : {clean_text}")
 
     else:
         st.info("Silakan masukkan teks ulasan terlebih dahulu.")
 
-# Footer
 st.markdown("---")
 st.caption("Dikembangkan oleh Kelompok 4 NLP")
