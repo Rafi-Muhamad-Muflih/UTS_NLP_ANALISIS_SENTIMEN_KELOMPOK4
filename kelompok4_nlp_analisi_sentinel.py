@@ -6,125 +6,212 @@ from nltk.corpus import stopwords
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 
 # =============================================================================
-# 1. KONFIGURASI HALAMAN & RESOURCE
+# 1. KONFIGURASI HALAMAN
 # =============================================================================
-st.set_page_config(page_title="Analisis Sentimen Shopee", page_icon="🛒")
+st.set_page_config(
+    page_title="Analisis Sentimen Shopee",
+    page_icon="🛒",
+    layout="centered"
+)
 
-# Download resource NLTK (Hanya sekali jalan, aman ditaruh di sini)
+# =============================================================================
+# 2. CUSTOM CSS (3D STYLE)
+# =============================================================================
+st.markdown("""
+<style>
+body {
+    background: linear-gradient(135deg, #f5f7fa, #e4ecf5);
+}
+
+.card {
+    background: white;
+    border-radius: 18px;
+    padding: 25px;
+    margin-top: 20px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    text-align: center;
+}
+
+.card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 25px 45px rgba(0,0,0,0.25);
+}
+
+.title-box {
+    background: linear-gradient(135deg, #6a11cb, #2575fc);
+    padding: 25px;
+    border-radius: 20px;
+    color: white;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.sentiment-positive {
+    color: #1b5e20;
+    font-weight: bold;
+    font-size: 22px;
+}
+
+.sentiment-neutral {
+    color: #f57f17;
+    font-weight: bold;
+    font-size: 22px;
+}
+
+.sentiment-negative {
+    color: #b71c1c;
+    font-weight: bold;
+    font-size: 22px;
+}
+
+.sentiment-waiting {
+    color: #9e9e9e;
+    font-style: italic;
+    font-size: 18px;
+}
+
+.footer {
+    text-align: center;
+    opacity: 0.6;
+    margin-top: 40px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# =============================================================================
+# 3. DOWNLOAD RESOURCE NLTK
+# =============================================================================
 try:
     nltk.data.find('corpora/stopwords')
 except LookupError:
     nltk.download('stopwords')
-    nltk.download('punkt')
 
 # =============================================================================
-# 2. FUNGSI PREPROCESSING (WAJIB SAMA PERSIS DENGAN TRAINING)
+# 4. PREPROCESSING
 # =============================================================================
-# Inisialisasi Stemmer
 factory = StemmerFactory()
 stemmer = factory.create_stemmer()
 
-# Konfigurasi Stopwords
 list_stopwords = set(stopwords.words('indonesian'))
 
-# DAFTAR KATA PENTING (Sama persis dengan script training terakhir)
 kata_penting = {
-    # Kata Negatif
-    'tidak', 'bukan', 'jangan', 'tak', 'belum', 'kurang', 'gak', 'ga', 'nggak',
-    'kecewa', 'jelek', 'buruk', 'parah', 'lama', 'lemot', 'susah', 'bangsat', 'hancur',
-    
-    # Kata Netral / Penyeimbang
-    'lumayan', 'biasa', 'cukup', 'standar', 'tapi', 'agak', 'sedikit', 'baja', 'saja', 
-    'kadang', 'bingung', 'standart', 'not bad', 'kurang lebih'
+    'tidak','bukan','jangan','tak','belum','kurang',
+    'gak','ga','nggak','kecewa','jelek','buruk','parah',
+    'lama','lemot','susah','lumayan','biasa','cukup',
+    'standar','tapi','agak','sedikit','saja'
 }
 
-# Hapus kata penting dari daftar stopwords
 list_stopwords = list_stopwords - kata_penting
 
 def text_preprocessing(text):
-    # a. Case Folding
     text = str(text).lower()
-
-    # b. Cleaning
-    text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text)
     text = re.sub(r'\d+', '', text)
     text = re.sub(r'[^\w\s]', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
-
-    # c. Tokenizing & Stopword Removal
     words = text.split()
-    filtered_words = [word for word in words if word not in list_stopwords]
-
-    # d. Gabung kembali
-    processed_text = " ".join(filtered_words)
-    return processed_text
+    filtered_words = [w for w in words if w not in list_stopwords]
+    return " ".join(filtered_words)
 
 # =============================================================================
-# 3. LOAD MODEL & VECTORIZER
+# 5. LOAD MODEL
 # =============================================================================
-@st.cache_resource # Agar tidak load ulang setiap kali klik tombol
+@st.cache_resource
 def load_assets():
-    try:
-        with open('model_sentiment.pkl', 'rb') as model_file:
-            loaded_model = pickle.load(model_file)
-        with open('vectorizer_tfidf.pkl', 'rb') as vec_file:
-            loaded_vec = pickle.load(vec_file)
-        return loaded_model, loaded_vec
-    except FileNotFoundError:
-        return None, None
+    # Pastikan file pkl berada di folder yang sama dengan script
+    with open('tfidf_vectorizer.pkl', 'rb') as f:
+        vectorizer = pickle.load(f)
+    with open('model_nb.pkl', 'rb') as f:
+        model_nb = pickle.load(f)
+    with open('model_svm.pkl', 'rb') as f:
+        model_svm = pickle.load(f)
+    return vectorizer, model_nb, model_svm
 
-model, vectorizer = load_assets()
-
-# =============================================================================
-# 4. TAMPILAN ANTARMUKA (UI)
-# =============================================================================
-st.title("🛒 Analisis Sentimen Ulasan Shopee")
-st.markdown("Aplikasi untuk mendeteksi sentimen: **Positif**, **Netral**, atau **Negatif**.")
-st.markdown("---")
-
-# Cek apakah model berhasil di-load
-if model is None or vectorizer is None:
-    st.error("⚠️ File 'model_sentiment.pkl' atau 'vectorizer_tfidf.pkl' tidak ditemukan! Pastikan file ada di folder yang sama.")
+# Eksekusi load model
+try:
+    vectorizer, model_nb, model_svm = load_assets()
+except FileNotFoundError:
+    st.error("File model (.pkl) tidak ditemukan. Pastikan file model ada di direktori yang sama.")
     st.stop()
 
-# Input User
-input_text = st.text_area("Masukkan Ulasan Pelanggan:", height=150, placeholder="Contoh: Barangnya lumayan bagus, tapi pengiriman agak lama...")
+# =============================================================================
+# 6. HEADER
+# =============================================================================
+st.markdown("""
+<div class="title-box">
+    <h1>🛒 Analisis Sentimen Shopee</h1>
+    <p>Dashboard Perbandingan Model Naive Bayes & SVM</p>
+</div>
+""", unsafe_allow_html=True)
 
-if st.button("🔍 Analisis Sentimen"):
-    if input_text:
+# =============================================================================
+# 7. INPUT CARD
+# =============================================================================
+st.markdown('<div class="card">', unsafe_allow_html=True)
+input_text = st.text_area(
+    "✍️ Masukkan Ulasan Pelanggan:",
+    height=130,
+    placeholder="Contoh: Barangnya lumayan bagus tapi pengirimannya lama"
+)
+analyze_button = st.button("🔍 Analisis Sentimen")
+st.markdown('</div>', unsafe_allow_html=True)
+
+# =============================================================================
+# 8. DEFAULT CARD (TAMPILAN AWAL)
+# =============================================================================
+# Mengisi card kosong dengan status menunggu
+label_nb, css_nb = ("Menunggu input ulasan...", "sentiment-waiting")
+label_svm, css_svm = ("Menunggu input ulasan...", "sentiment-waiting")
+
+# =============================================================================
+# 9. PREDIKSI (DIJALANKAN SAAT TOMBOL DIKLIK)
+# =============================================================================
+if analyze_button:
+    if input_text.strip() != "":
         with st.spinner('Sedang menganalisis...'):
-            # 1. Preprocessing
             clean_text = text_preprocessing(input_text)
-            
-            # 2. Vectorization (Ubah ke angka)
-            text_vector = vectorizer.transform([clean_text])
-            
-            # 3. Prediksi (Outputnya Angka: 0, 1, atau 2)
-            prediksi_angka = model.predict(text_vector)[0]
-            
-            # 4. Logika Mapping Output (0=Negatif, 1=Netral, 2=Positif)
-            st.markdown("### Hasil Analisis:")
-            
-            if prediksi_angka == 2: # Positif
-                st.success(f"😊 **POSITIF**")
-                st.write("Ulasan ini mengandung nada kepuasan atau pujian.")
-                
-            elif prediksi_angka == 1: # Netral
-                st.warning(f"😐 **NETRAL**")
-                st.write("Ulasan ini cenderung biasa saja, standar, atau memiliki sentimen campuran (bagus tapi ada kurangnya).")
-                
-            elif prediksi_angka == 0: # Negatif
-                st.error(f"😡 **NEGATIF**")
-                st.write("Ulasan ini mengandung keluhan, kekecewaan, atau kemarahan.")
-                
-            # (Opsional) Tampilkan teks bersih untuk debug
-            with st.expander("Lihat Hasil Preprocessing (Debug)"):
-                st.text(f"Original: {input_text}")
-                st.text(f"Cleaned : {clean_text}")
+            vector = vectorizer.transform([clean_text])
 
+            pred_nb = model_nb.predict(vector)[0]
+            pred_svm = model_svm.predict(vector)[0]
+
+            # Mapping label hasil prediksi
+            label_map = {
+                0: ("NEGATIF 😡", "sentiment-negative"),
+                1: ("NETRAL 😐", "sentiment-neutral"),
+                2: ("POSITIF 😊", "sentiment-positive")
+            }
+
+            label_nb, css_nb = label_map[pred_nb]
+            label_svm, css_svm = label_map[pred_svm]
     else:
-        st.info("Silakan masukkan teks ulasan terlebih dahulu.")
+        st.warning("Silakan masukkan teks ulasan terlebih dahulu!")
 
-# Footer
-st.markdown("---")
-st.caption("Dikembangkan oleh Kelompok 4 NLP")
+# =============================================================================
+# 10. HASIL PERBANDINGAN
+# =============================================================================
+st.markdown("## 📊 Perbandingan Model")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("🧮 Naive Bayes")
+    st.markdown(f'<p class="{css_nb}">{label_nb}</p>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col2:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("⚙️ SVM")
+    st.markdown(f'<p class="{css_svm}">{label_svm}</p>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# =============================================================================
+# 11. FOOTER
+# =============================================================================
+st.markdown("""
+<div class="footer">
+    Kelompok 4 | UAS NLP – Analisis Sentimen Shopee
+</div>
+""", unsafe_allow_html=True)
